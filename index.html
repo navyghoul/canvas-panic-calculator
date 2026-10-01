@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canvas Panic Calculator</title>
+  <meta name="description" content="Figure out exactly what you need on your remaining assignments and final exam to pass or hit your target grade.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.tailwind && (tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace']
+          }
+        }
+      }
+    });
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
+    .panic-range { -webkit-appearance: none; appearance: none; width: 100%; height: 10px; border-radius: 9999px; outline: none; cursor: pointer; }
+    .panic-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 26px; height: 26px; border-radius: 9999px; background: #f8fafc; border: 4px solid var(--thumb, #6366f1); box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.18); transition: transform .12s ease; }
+    .panic-range::-webkit-slider-thumb:hover { transform: scale(1.1); }
+    .panic-range::-moz-range-thumb { width: 20px; height: 20px; border-radius: 9999px; background: #f8fafc; border: 4px solid var(--thumb, #6366f1); }
+    .panic-range:disabled { cursor: not-allowed; opacity: .45; }
+    .panic-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 6px rgba(129, 140, 248, 0.5); }
+
+    .fade-in { animation: fadeIn .18s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-100 font-sans antialiased selection:bg-indigo-500/40">
+  <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-12">
+
+    <header class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <div class="mb-2 inline-flex items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-rose-300">
+          <span class="h-2 w-2 animate-pulse rounded-full bg-rose-400"></span>
+          Finals week mode
+        </div>
+        <h1 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Canvas Panic Calculator</h1>
+        <p class="mt-2 max-w-xl text-slate-400">Enter your syllabus weights and the scores you already have. Leave a score blank if the work isn't graded yet.</p>
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label for="presetSelect" class="text-xs font-semibold uppercase tracking-wider text-slate-400">Load a syllabus preset</label>
+        <select id="presetSelect" class="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-100 shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 sm:w-64">
+          <option value="">Choose a template…</option>
+          <option value="stem">Standard STEM</option>
+          <option value="humanities">Humanities / Essay</option>
+          <option value="examHeavy">Exam-Heavy</option>
+        </select>
+      </div>
+    </header>
+
+    <main class="grid gap-6 lg:grid-cols-5">
+
+      <section class="rounded-2xl border border-slate-800 bg-slate-800/50 p-5 shadow-xl shadow-black/20 sm:p-6 lg:col-span-3" aria-labelledby="categoriesHeading">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <h2 id="categoriesHeading" class="text-lg font-bold text-white">Grade Components</h2>
+          <button id="clearBtn" type="button" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-400 transition hover:bg-slate-700/60 hover:text-slate-200">Clear all</button>
+        </div>
+
+        <div class="hidden grid-cols-12 gap-3 px-1 pb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 sm:grid">
+          <div class="col-span-5">Category</div>
+          <div class="col-span-3">Weight %</div>
+          <div class="col-span-3">Score %</div>
+          <div class="col-span-1"></div>
+        </div>
+
+        <ul id="categoryList" class="space-y-3"></ul>
+
+        <div id="emptyState" class="hidden rounded-xl border border-dashed border-slate-700 px-4 py-10 text-center text-sm text-slate-400">
+          No components yet. Add one below or load a preset.
+        </div>
+
+        <button id="addBtn" type="button" class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-600 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:border-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
+          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 4a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2h-4v4a1 1 0 1 1-2 0v-4H5a1 1 0 1 1 0-2h4V5a1 1 0 0 1 1-1Z"/></svg>
+          Add component
+        </button>
+
+        <div class="mt-5 rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
+          <div class="flex items-center justify-between text-sm">
+            <span class="font-semibold text-slate-300">Total Weight</span>
+            <span id="weightTotal" class="font-mono font-bold">0% / 100%</span>
+          </div>
+          <div class="mt-2.5 h-2 overflow-hidden rounded-full bg-slate-700">
+            <div id="weightBar" class="h-full rounded-full bg-indigo-500 transition-all duration-300" style="width:0%"></div>
+          </div>
+          <p id="weightMessage" class="mt-2.5 text-xs text-slate-400"></p>
+        </div>
+
+        <dl class="mt-4 grid grid-cols-3 gap-3 text-center">
+          <div class="rounded-xl bg-slate-900/60 p-3">
+            <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Graded weight</dt>
+            <dd id="statGraded" class="mt-1 font-mono text-lg font-bold text-white">0%</dd>
+          </div>
+          <div class="rounded-xl bg-slate-900/60 p-3">
+            <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Remaining</dt>
+            <dd id="statRemaining" class="mt-1 font-mono text-lg font-bold text-indigo-300">0%</dd>
+          </div>
+          <div class="rounded-xl bg-slate-900/60 p-3">
+            <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Current avg</dt>
+            <dd id="statCurrent" class="mt-1 font-mono text-lg font-bold text-white">—</dd>
+          </div>
+        </dl>
+      </section>
+
+      <div class="space-y-6 lg:col-span-2">
+
+        <section class="rounded-2xl border border-slate-800 bg-slate-800/50 p-5 shadow-xl shadow-black/20 sm:p-6" aria-labelledby="sliderHeading">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 id="sliderHeading" class="text-lg font-bold text-white">The Panic Slider</h2>
+              <p id="sliderSubtitle" class="mt-1 text-sm text-slate-400">What if you score this on everything left?</p>
+            </div>
+            <span id="statusBadge" class="shrink-0 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ring-1"></span>
+          </div>
+
+          <div class="mt-6 flex items-end justify-between">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Predicted grade</div>
+              <div class="mt-1 flex items-baseline gap-3">
+                <span id="predictedPct" class="font-mono text-5xl font-bold tracking-tight text-white">0.0%</span>
+                <span id="predictedLetter" class="text-3xl font-extrabold">F</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6">
+            <div class="mb-2 flex items-center justify-between text-sm">
+              <label for="panicSlider" class="font-semibold text-slate-300">Score on remaining work</label>
+              <span id="sliderValue" class="rounded-md bg-slate-900 px-2 py-0.5 font-mono font-bold text-indigo-300">85%</span>
+            </div>
+            <input id="panicSlider" type="range" min="0" max="100" step="1" value="85" class="panic-range" aria-describedby="sliderSubtitle">
+            <div class="mt-1.5 flex justify-between font-mono text-[11px] text-slate-500">
+              <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="rounded-2xl border border-slate-800 bg-slate-800/50 p-5 shadow-xl shadow-black/20 sm:p-6" aria-labelledby="solverHeading">
+          <h2 id="solverHeading" class="text-lg font-bold text-white">Target Grade Reverse-Solver</h2>
+          <p class="mt-1 text-sm text-slate-400">Pick a target to see the exact score you need on the remaining weight.</p>
+          <div id="targetButtons" class="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-3 xl:grid-cols-5" role="group" aria-label="Target grades"></div>
+          <div id="solverResult" class="mt-4" aria-live="polite"></div>
+        </section>
+
+      </div>
+    </main>
+
+    <footer class="mt-10 text-center text-xs text-slate-500">
+      Predictions are normalized to your total entered weight. Always double-check against your syllabus and Canvas gradebook.
+    </footer>
+  </div>
+
+  <script>
+    const PRESETS = {
+      stem: [
+        { name: 'Midterm 1', weight: 20, score: 84 },
+        { name: 'Midterm 2', weight: 20, score: 77 },
+        { name: 'Final', weight: 40, score: null },
+        { name: 'Homework', weight: 20, score: 93 }
+      ],
+      humanities: [
+        { name: 'Essay 1', weight: 25, score: 88 },
+        { name: 'Essay 2', weight: 25, score: 81 },
+        { name: 'Final Paper', weight: 30, score: null },
+        { name: 'Participation', weight: 20, score: 95 }
+      ],
+      examHeavy: [
+        { name: 'Midterm', weight: 30, score: 71 },
+        { name: 'Final', weight: 50, score: null },
+        { name: 'Quizzes', weight: 20, score: 86 }
+      ]
+    };
+
+    const TARGETS = [
+      { label: 'A', value: 93 },
+      { label: 'A-', value: 90 },
+      { label: 'B', value: 83 },
+      { label: 'C', value: 73 },
+      { label: 'Pass', value: 70 }
+    ];
+
+    const STATUS_TIERS = [
+      { min: 90, text: 'Chilling', badge: 'bg-green-500/15 text-green-300 ring-green-500/40', accent: '#22c55e', letterClass: 'text-green-400' },
+      { min: 80, text: 'Solid', badge: 'bg-teal-500/15 text-teal-300 ring-teal-500/40', accent: '#14b8a6', letterClass: 'text-teal-400' },
+      { min: 70, text: 'Ducking Danger', badge: 'bg-amber-500/15 text-amber-300 ring-amber-500/40', accent: '#f59e0b', letterClass: 'text-amber-400' },
+      { min: -Infinity, text: 'Cooked / Retake Territory', badge: 'bg-red-500/15 text-red-300 ring-red-500/40', accent: '#ef4444', letterClass: 'text-red-400' }
+    ];
+
+    const STORAGE_KEY = 'canvas-panic-calculator:v1';
+    const EPSILON = 1e-9;
+
+    const state = {
+      rows: [],
+      sliderValue: 85,
+      selectedTarget: null,
+      nextId: 1
+    };
+
+    const els = {
+      list: document.getElementById('categoryList'),
+      empty: document.getElementById('emptyState'),
+      addBtn: document.getElementById('addBtn'),
+      clearBtn: document.getElementById('clearBtn'),
+      preset: document.getElementById('presetSelect'),
+      weightTotal: document.getElementById('weightTotal'),
+      weightBar: document.getElementById('weightBar'),
+      weightMessage: document.getElementById('weightMessage'),
+      statGraded: document.getElementById('statGraded'),
+      statRemaining: document.getElementById('statRemaining'),
+      statCurrent: document.getElementById('statCurrent'),
+      slider: document.getElementById('panicSlider'),
+      sliderValue: document.getElementById('sliderValue'),
+      sliderSubtitle: document.getElementById('sliderSubtitle'),
+      predictedPct: document.getElementById('predictedPct'),
+      predictedLetter: document.getElementById('predictedLetter'),
+      statusBadge: document.getElementById('statusBadge'),
+      targetButtons: document.getElementById('targetButtons'),
+      solverResult: document.getElementById('solverResult')
+    };
+
+    const parseNumber = (raw) => {
+      if (raw === null || raw === undefined) return null;
+      const text = String(raw).trim();
+      if (text === '') return null;
+      const n = Number(text);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const fmt = (n, digits = 1) => String(parseFloat(Number(n).toFixed(digits)));
+
+    const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    const createRow = (name = '', weight = null, score = null) => ({ id: state.nextId++, name, weight, score });
+
+    const letterFor = (pct) => {
+      if (pct >= 90) return 'A';
+      if (pct >= 80) return 'B';
+      if (pct >= 70) return 'C';
+      if (pct >= 60) return 'D';
+      return 'F';
+    };
+
+    const tierFor = (pct) => STATUS_TIERS.find((t) => pct >= t.min);
+
+    const computeSummary = () => {
+      let totalWeight = 0;
+      let gradedWeight = 0;
+      let earnedPoints = 0;
+      state.rows.forEach((row) => {
+        const w = row.weight !== null && row.weight > 0 ? row.weight : 0;
+        totalWeight += w;
+        if (row.score !== null) {
+          gradedWeight += w;
+          earnedPoints += (w * row.score) / 100;
+        }
+      });
+      const remainingWeight = totalWeight - gradedWeight;
+      const currentAverage = gradedWeight > 0 ? (earnedPoints / gradedWeight) * 100 : null;
+      return { totalWeight, gradedWeight, remainingWeight, earnedPoints, currentAverage };
+    };
+
+    const predictGrade = (summary, hypothetical) => {
+      if (summary.totalWeight <= 0) return null;
+      const points = summary.earnedPoints + (summary.remainingWeight * hypothetical) / 100;
+      return (points / summary.totalWeight) * 100;
+    };
+
+    const solveRequired = (summary, target) => {
+      if (summary.totalWeight <= 0) return { kind: 'noData' };
+      const neededPoints = (target * summary.totalWeight) / 100 - summary.earnedPoints;
+      if (summary.remainingWeight <= EPSILON) {
+        const finalGrade = (summary.earnedPoints / summary.totalWeight) * 100;
+        return { kind: neededPoints <= EPSILON ? 'lockedIn' : 'lockedOut', finalGrade };
+      }
+      const required = (neededPoints / summary.remainingWeight) * 100;
+      if (required > 100 + EPSILON) return { kind: 'impossible', required };
+      if (required <= EPSILON) return { kind: 'secured', required };
+      return { kind: 'needed', required };
+    };
+
+    const rowTemplate = (row) => `
+      <li class="fade-in grid grid-cols-12 gap-2 rounded-xl border border-slate-700/70 bg-slate-900/50 p-3 sm:gap-3 sm:border-0 sm:bg-transparent sm:p-0" data-id="${row.id}">
+        <div class="col-span-12 sm:col-span-5">
+          <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 sm:hidden" for="name-${row.id}">Category</label>
+          <input id="name-${row.id}" data-field="name" type="text" value="${escapeHtml(row.name)}" placeholder="e.g. Midterm 1" maxlength="60"
+            class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-100 placeholder-slate-600 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
+        </div>
+        <div class="col-span-5 sm:col-span-3">
+          <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 sm:hidden" for="weight-${row.id}">Weight %</label>
+          <div class="relative">
+            <input id="weight-${row.id}" data-field="weight" type="number" inputmode="decimal" min="0" max="100" step="any" value="${row.weight ?? ''}" placeholder="0"
+              class="w-full rounded-lg border border-slate-700 bg-slate-900 py-2 pl-3 pr-7 font-mono text-sm text-slate-100 placeholder-slate-600 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
+            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">%</span>
+          </div>
+        </div>
+        <div class="col-span-5 sm:col-span-3">
+          <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 sm:hidden" for="score-${row.id}">Score %</label>
+          <div class="relative">
+            <input id="score-${row.id}" data-field="score" type="number" inputmode="decimal" min="0" step="any" value="${row.score ?? ''}" placeholder="—"
+              class="w-full rounded-lg border border-slate-700 bg-slate-900 py-2 pl-3 pr-7 font-mono text-sm text-slate-100 placeholder-slate-600 placeholder:font-sans focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
+            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">%</span>
+          </div>
+        </div>
+        <div class="col-span-2 flex items-end sm:col-span-1 sm:items-center">
+          <button type="button" data-action="delete" aria-label="Delete ${escapeHtml(row.name || 'component')}"
+            class="flex h-[38px] w-full items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-500/15 hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-red-500/40">
+            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+      </li>`;
+
+    const renderList = () => {
+      els.list.innerHTML = state.rows.map(rowTemplate).join('');
+      els.empty.classList.toggle('hidden', state.rows.length > 0);
+    };
+
+    const renderWeights = (summary) => {
+      const total = summary.totalWeight;
+      const over = total > 100 + EPSILON;
+      const exact = Math.abs(total - 100) <= 0.001;
+      els.weightTotal.textContent = `${fmt(total, 2)}% / 100%`;
+      els.weightTotal.className = `font-mono font-bold ${over ? 'text-red-400' : exact ? 'text-green-400' : 'text-amber-300'}`;
+      els.weightBar.style.width = `${Math.min(total, 100)}%`;
+      els.weightBar.className = `h-full rounded-full transition-all duration-300 ${over ? 'bg-red-500' : exact ? 'bg-green-500' : 'bg-indigo-500'}`;
+
+      if (over) {
+        els.weightMessage.innerHTML = `<span class="font-semibold text-red-400">⚠ Total weight exceeds 100% by ${fmt(total - 100, 2)}%.</span> Double-check your syllabus weights.`;
+      } else if (exact) {
+        els.weightMessage.innerHTML = '<span class="text-green-400">✓ Weights add up to 100%.</span>';
+      } else if (total > 0) {
+        els.weightMessage.innerHTML = `<span class="text-amber-300">${fmt(100 - total, 2)}% of the course is unaccounted for.</span> Predictions are scaled to the ${fmt(total, 2)}% you've entered.`;
+      } else {
+        els.weightMessage.textContent = 'Add components with weights to get started.';
+      }
+
+      const invalid = state.rows.some((r) => (r.weight !== null && r.weight < 0) || (r.score !== null && r.score < 0));
+      if (invalid) {
+        els.weightMessage.innerHTML += ' <span class="block pt-1 text-red-400">Negative weights or scores are ignored.</span>';
+      }
+
+      els.statGraded.textContent = `${fmt(summary.gradedWeight, 2)}%`;
+      els.statRemaining.textContent = `${fmt(summary.remainingWeight, 2)}%`;
+      els.statCurrent.textContent = summary.currentAverage === null ? '—' : `${fmt(summary.currentAverage)}%`;
+      els.statCurrent.className = `mt-1 font-mono text-lg font-bold ${summary.currentAverage === null ? 'text-slate-500' : tierFor(summary.currentAverage).letterClass}`;
+    };
+
+    const renderSlider = (summary) => {
+      const value = state.sliderValue;
+      const hasRemaining = summary.remainingWeight > EPSILON;
+      els.slider.value = value;
+      els.slider.disabled = !hasRemaining;
+      els.sliderValue.textContent = hasRemaining ? `${value}%` : 'N/A';
+
+      if (summary.totalWeight <= 0) {
+        els.sliderSubtitle.textContent = 'Add some weighted components first.';
+      } else if (!hasRemaining) {
+        els.sliderSubtitle.textContent = 'Everything is graded. This is your final grade.';
+      } else {
+        els.sliderSubtitle.textContent = `What if you score ${value}% on the remaining ${fmt(summary.remainingWeight, 2)}% of the course?`;
+      }
+
+      const predicted = predictGrade(summary, value);
+      const shown = predicted === null ? 0 : predicted;
+      const tier = tierFor(shown);
+      els.predictedPct.textContent = predicted === null ? '—' : `${shown.toFixed(1)}%`;
+      els.predictedLetter.textContent = predicted === null ? '' : letterFor(shown);
+      els.predictedLetter.className = `text-3xl font-extrabold ${tier.letterClass}`;
+      els.statusBadge.textContent = predicted === null ? 'No data' : tier.text;
+      els.statusBadge.className = `shrink-0 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ring-1 ${predicted === null ? 'bg-slate-700/40 text-slate-400 ring-slate-600' : tier.badge}`;
+
+      const pct = (value / 100) * 100;
+      els.slider.style.background = `linear-gradient(to right, ${tier.accent} 0%, ${tier.accent} ${pct}%, #334155 ${pct}%, #334155 100%)`;
+      els.slider.style.setProperty('--thumb', tier.accent);
+    };
+
+    const renderTargetButtons = () => {
+      els.targetButtons.innerHTML = TARGETS.map((t) => {
+        const active = state.selectedTarget === t.value;
+        return `<button type="button" data-target="${t.value}" aria-pressed="${active}"
+          class="rounded-xl border px-2 py-2.5 text-center transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 ${active ? 'border-indigo-400 bg-indigo-500/20 text-white' : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:border-slate-500 hover:text-white'}">
+          <span class="block text-base font-extrabold">${t.label}</span>
+          <span class="block font-mono text-[11px] text-slate-400">${t.value}%</span>
+        </button>`;
+      }).join('');
+    };
+
+    const resultCard = (tone, title, body) => {
+      const tones = {
+        good: 'border-green-500/40 bg-green-500/10 text-green-200',
+        info: 'border-indigo-500/40 bg-indigo-500/10 text-indigo-100',
+        warn: 'border-amber-500/40 bg-amber-500/10 text-amber-100',
+        bad: 'border-red-500/50 bg-red-500/10 text-red-200',
+        muted: 'border-slate-700 bg-slate-900/60 text-slate-300'
+      };
+      return `<div role="alert" class="fade-in rounded-xl border p-4 ${tones[tone]}">
+        <div class="font-bold">${title}</div>
+        ${body ? `<div class="mt-1 text-sm opacity-90">${body}</div>` : ''}
+      </div>`;
+    };
+
+    const renderSolver = (summary) => {
+      if (state.selectedTarget === null) {
+        els.solverResult.innerHTML = resultCard('muted', 'No target selected', 'Tap a grade above to reverse-solve it.');
+        return;
+      }
+      const target = TARGETS.find((t) => t.value === state.selectedTarget);
+      const result = solveRequired(summary, target.value);
+      const label = `${target.label} (${target.value}%)`;
+
+      switch (result.kind) {
+        case 'noData':
+          els.solverResult.innerHTML = resultCard('muted', 'Not enough info', 'Add components with weights first.');
+          break;
+        case 'lockedIn':
+          els.solverResult.innerHTML = resultCard('good', `Locked in: you hit ${label}.`, `Everything is graded and your final grade is ${result.finalGrade.toFixed(2)}%.`);
+          break;
+        case 'lockedOut':
+          els.solverResult.innerHTML = resultCard('bad', `No remaining work to change this.`, `Everything is graded at ${result.finalGrade.toFixed(2)}%, short of ${label}. Ask about extra credit or a regrade.`);
+          break;
+        case 'impossible':
+          els.solverResult.innerHTML = resultCard('bad', `Mathematically impossible (Requires ${result.required.toFixed(2)}%) - Consider dropping.`, `Even a perfect 100% on the remaining ${fmt(summary.remainingWeight, 2)}% won't reach ${label}.`);
+          break;
+        case 'secured':
+          els.solverResult.innerHTML = resultCard('good', 'Already secured! You could get a 0% and still hit this.', `${label} is locked in no matter what happens on the remaining ${fmt(summary.remainingWeight, 2)}%.`);
+          break;
+        default: {
+          const tone = result.required >= 90 ? 'warn' : 'info';
+          els.solverResult.innerHTML = resultCard(tone,
+            `You need ${result.required.toFixed(2)}% on the remaining ${fmt(summary.remainingWeight, 2)}%.`,
+            `That's the minimum average across all ungraded work to finish with ${label}.`);
+        }
+      }
+    };
+
+    const persist = () => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          rows: state.rows.map(({ name, weight, score }) => ({ name, weight, score })),
+          sliderValue: state.sliderValue,
+          selectedTarget: state.selectedTarget
+        }));
+      } catch (e) {}
+    };
+
+    const restore = () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (!saved || !Array.isArray(saved.rows)) return false;
+        state.rows = saved.rows.map((r) => createRow(String(r.name ?? ''), parseNumber(r.weight), parseNumber(r.score)));
+        state.sliderValue = Number.isFinite(saved.sliderValue) ? Math.min(100, Math.max(0, saved.sliderValue)) : 85;
+        state.selectedTarget = TARGETS.some((t) => t.value === saved.selectedTarget) ? saved.selectedTarget : null;
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+
+    const refresh = () => {
+      const summary = computeSummary();
+      renderWeights(summary);
+      renderSlider(summary);
+      renderSolver(summary);
+      persist();
+    };
+
+    const fullRender = () => {
+      renderList();
+      renderTargetButtons();
+      refresh();
+    };
+
+    const loadPreset = (key) => {
+      const preset = PRESETS[key];
+      if (!preset) return;
+      state.rows = preset.map((r) => createRow(r.name, r.weight, r.score));
+      fullRender();
+    };
+
+    els.list.addEventListener('input', (e) => {
+      const field = e.target.dataset.field;
+      if (!field) return;
+      const id = Number(e.target.closest('li').dataset.id);
+      const row = state.rows.find((r) => r.id === id);
+      if (!row) return;
+      if (field === 'name') {
+        row.name = e.target.value;
+        const del = e.target.closest('li').querySelector('[data-action="delete"]');
+        del.setAttribute('aria-label', `Delete ${row.name || 'component'}`);
+        persist();
+        return;
+      }
+      const n = parseNumber(e.target.value);
+      row[field] = n !== null && n < 0 ? null : n;
+      e.target.classList.toggle('border-red-500', n !== null && n < 0);
+      refresh();
+    });
+
+    els.list.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action="delete"]');
+      if (!btn) return;
+      const li = btn.closest('li');
+      const id = Number(li.dataset.id);
+      const index = state.rows.findIndex((r) => r.id === id);
+      state.rows = state.rows.filter((r) => r.id !== id);
+      renderList();
+      refresh();
+      const next = els.list.querySelectorAll('[data-action="delete"]')[Math.min(index, state.rows.length - 1)];
+      (next || els.addBtn).focus();
+    });
+
+    els.addBtn.addEventListener('click', () => {
+      const row = createRow();
+      state.rows.push(row);
+      renderList();
+      refresh();
+      document.getElementById(`name-${row.id}`).focus();
+    });
+
+    els.clearBtn.addEventListener('click', () => {
+      state.rows = [];
+      els.preset.value = '';
+      renderList();
+      refresh();
+    });
+
+    els.preset.addEventListener('change', (e) => loadPreset(e.target.value));
+
+    els.slider.addEventListener('input', (e) => {
+      state.sliderValue = Number(e.target.value);
+      const summary = computeSummary();
+      renderSlider(summary);
+      persist();
+    });
+
+    els.targetButtons.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-target]');
+      if (!btn) return;
+      state.selectedTarget = Number(btn.dataset.target);
+      renderTargetButtons();
+      renderSolver(computeSummary());
+      persist();
+    });
+
+    if (!restore()) {
+      state.rows = PRESETS.stem.map((r) => createRow(r.name, r.weight, r.score));
+      els.preset.value = 'stem';
+    }
+    fullRender();
+  </script>
+</body>
+</html>
